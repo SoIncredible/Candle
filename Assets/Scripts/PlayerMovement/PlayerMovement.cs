@@ -7,7 +7,7 @@ namespace PlayerMovement
         private Camera _camera;
         private Rigidbody _rigidBody;
 
-        [SerializeField] private float turnSpeed = 0.02f;
+        [SerializeField] private float turnSpeed = 20f;
         [SerializeField] private float speed = 20f;
 
         private Vector2 _moveDirection = Vector2.zero;
@@ -22,8 +22,8 @@ namespace PlayerMovement
         {
             UpdateInput();
          
-           UpdateMovement();
-           UpdateRotation();
+            UpdateMovement();
+            UpdateRotation();
         }
 
         private void UpdateInput()
@@ -62,7 +62,7 @@ namespace PlayerMovement
         {
             if(_moveDirection.magnitude <= 0.01f) return;
             var rotation = Quaternion.Slerp(_rigidBody.rotation,
-                Quaternion.LookRotation (CameraDirection(new Vector3(_moveDirection.x, 0, _moveDirection.y))), turnSpeed);
+                Quaternion.LookRotation (CameraDirection(new Vector3(_moveDirection.x, 0, _moveDirection.y))), turnSpeed * Time.deltaTime);
             
             _rigidBody.MoveRotation(rotation);
         }
