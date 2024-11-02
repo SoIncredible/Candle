@@ -1,24 +1,31 @@
 using UnityEngine;
 
-namespace PlayerMovement
+namespace Handler
 {
-    public class PlayerMovement : MonoBehaviour
+    public class PlayerMovementHandler
     {
         private Camera _camera;
-        private Rigidbody _rigidBody;
+        private readonly Rigidbody _rigidBody;
+        private readonly Transform _playerTransform;
 
-        [SerializeField] private float turnSpeed = 20f;
-        [SerializeField] private float speed = 20f;
+        private const float TurnSpeed = 20f;
+        private const float Speed = 20f;
 
         private Vector2 _moveDirection = Vector2.zero;
+
+        public PlayerMovementHandler(Camera camera, Rigidbody rigidBody, Transform playerTransform)
+        {
+            _camera = camera;
+            _rigidBody = rigidBody;
+            _playerTransform = playerTransform;
+        }
+        
         private void Awake()
         {
             _camera = GameObject.Find("Camera").GetComponent<Camera>();
-
-            _rigidBody = GetComponent<Rigidbody>();
         }
 
-        private void Update()
+        public void Tick()
         {
             UpdateInput();
          
@@ -54,15 +61,15 @@ namespace PlayerMovement
         
         private void UpdateMovement()
         {
-           var movement = CameraDirection(new Vector3(_moveDirection.x, 0, _moveDirection.y)) * speed * Time.deltaTime;
-           _rigidBody.MovePosition(transform.position + movement);
+           var movement = CameraDirection(new Vector3(_moveDirection.x, 0, _moveDirection.y)) * Speed * Time.deltaTime;
+           _rigidBody.MovePosition(_playerTransform.position + movement);
         }
 
         private void UpdateRotation()
         {
             if(_moveDirection.magnitude <= 0.01f) return;
             var rotation = Quaternion.Slerp(_rigidBody.rotation,
-                Quaternion.LookRotation (CameraDirection(new Vector3(_moveDirection.x, 0, _moveDirection.y))), turnSpeed * Time.deltaTime);
+                Quaternion.LookRotation (CameraDirection(new Vector3(_moveDirection.x, 0, _moveDirection.y))), TurnSpeed * Time.deltaTime);
             
             _rigidBody.MoveRotation(rotation);
         }

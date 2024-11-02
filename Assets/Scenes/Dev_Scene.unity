@@ -2440,6 +2440,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 95412116216673402, guid: 27a5d324bf48e4e238392ae4e89fb2f5, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -14670,11 +14674,10 @@ MonoBehaviour:
   m_GameObject: {fileID: 317359155282436254}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d10d817904ea41c992dc6a75d3e47759, type: 3}
+  m_Script: {fileID: 11500000, guid: 6722055b183249d2b42848d681891cf2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  turnSpeed: 10
-  speed: 20
+  camera: {fileID: 963194227}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

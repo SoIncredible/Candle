@@ -1,3 +1,4 @@
+using System;
 using CommandModeInput;
 using CommandModeInput.Entity;
 using CommandModeInput.InputMapping;
@@ -8,6 +9,7 @@ using UnityEngine;
 
 namespace New
 {
+    [Obsolete]
     [RequireComponent(typeof(PlayerEntity))]
     [RequireComponent(typeof(Animator))]
     [RequireComponent(typeof(InputHandler))]
