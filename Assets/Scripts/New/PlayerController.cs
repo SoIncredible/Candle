@@ -27,7 +27,8 @@ namespace New
         {
             if (characterDefine == null)
             {
-                characterDefine = AssetDatabase.LoadAssetAtPath<CharacterDefine>("Assets/AssetBundle/Config/Player/CharacterDefine.asset");
+                // TODO Eddie 接入YooAsset 不要用AssetDatabase
+                // characterDefine = AssetDatabase.LoadAssetAtPath<CharacterDefine>("Assets/AssetBundle/Config/Player/CharacterDefine.asset");
             }
 
             var animator = GetComponent<Animator>();
