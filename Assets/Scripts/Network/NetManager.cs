@@ -63,6 +63,7 @@ namespace Network
 
         /// <summary>
         /// 发送消息给服务端
+        /// 这里有粘包问题 如果给每个协议后面加一个标识符可不可以?
         /// </summary>
         public static void Send(string sendStr)
         {
@@ -76,6 +77,11 @@ namespace Network
             {
                 Debug.LogError("[NetManager] 发送消息失败! 连接服务器失败!");
                 return;
+            }
+
+            if (!sendStr.EndsWith("#"))
+            {
+                sendStr += "#"; // 用来标识协议的结束
             }
             
             Debug.Log("[NetManager] SendMsg:" + sendStr);            
@@ -100,8 +106,14 @@ namespace Network
                 var socket = (Socket)ar.AsyncState;
                 var count = socket.EndReceive(ar);
                 var receiveStr = System.Text.Encoding.UTF8.GetString(_readBuffer, 0, count);
-                Debug.Log("[NetManager] ReceiveMsg:" + receiveStr);
-                msgList.Add(receiveStr);
+                // 这里处理下粘包问题
+                var protos = receiveStr.Split('#', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var proto in protos)
+                {
+                    Debug.Log("[NetManager] ReceiveMsg:" + proto);
+                    msgList.Add(proto);    
+                }
+                
                 _socket.BeginReceive(_readBuffer, 0, 1024, 0, ReceiveCallback, _socket);
             }
             catch (SocketException e)

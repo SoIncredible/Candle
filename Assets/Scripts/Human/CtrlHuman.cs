@@ -30,6 +30,46 @@ namespace Human
                     NetManager.Send(sendStr);
                 }
             }
+
+            if (Input.GetMouseButtonUp(1)) // 按下鼠标右键
+            {
+                if (isAttacking) return; // 正在攻击, 不能反复攻击
+                if(isMoving) return; // 移动过程中不能攻击
+                
+                var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+                Physics.Raycast(ray, out var hit);
+                
+                transform.LookAt(hit.point);
+                Attack();
+                
+                var sendStr = "Attack|";
+                sendStr += NetManager.GetDesc() + ",";
+                sendStr += transform.eulerAngles.x + ",";
+                NetManager.Send(sendStr);
+                
+                var lineEnd = transform.position + 0.5f * Vector3.up;
+                var lineStart = lineEnd + 20 * transform.forward;
+                if (Physics.Linecast(lineStart, lineEnd, out hit))
+                {
+                    var hitObj = hit.collider.gameObject;
+                    if (hitObj == gameObject)
+                    {
+                        return;
+                    }
+                    
+                    var h = hitObj.GetComponent<SyncHuman>();
+                    if (h == null)
+                    {
+                        return;
+                    }
+
+                    sendStr = "Hit|";
+                    sendStr += NetManager.GetDesc() + ","; // 攻击者信息
+                    sendStr += h.desc + ","; // 被攻击者信息
+                    NetManager.Send(sendStr);
+                }
+                
+            }
         }
     }
 }

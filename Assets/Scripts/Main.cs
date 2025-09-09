@@ -14,7 +14,7 @@ public class Main : MonoBehaviour
     
     public Dictionary<string, BaseHuman> otherHumans = new Dictionary<string, BaseHuman>();
     
-    private IEnumerator Start()
+    private void Start()
     {
         // TODO Eddie 增加连接机制
         // TODO Eddie 增加心跳检测机制
@@ -23,6 +23,9 @@ public class Main : MonoBehaviour
         NetManager.AddListener("Leave", OnLeave);
         NetManager.AddListener("List", OnList);
         NetManager.AddListener("Attack", OnAttack);
+        NetManager.AddListener("Hit", OnHit);
+        NetManager.AddListener("Die", OnDie);
+        
         NetManager.Connect("127.0.0.1", 8888);
         
         var obj = Instantiate(humanPrefab);
@@ -42,10 +45,7 @@ public class Main : MonoBehaviour
         sendStr += eul.y;
         NetManager.Send(sendStr);
 
-        yield return WaitForSecondsMgr.Instance.GetWaitForSeconds(0.5f);
-        
-        // TODO Eddie 粘包问题解决
-        // 尝试做一下分帧 目前存在粘包问题
+        // yield return WaitForSecondsMgr.Instance.GetWaitForSeconds(0.5f);
         // 发送List协议 请求玩家列表
         NetManager.Send("List|");
     }
@@ -143,6 +143,51 @@ public class Main : MonoBehaviour
 
     private void OnAttack(string msg)
     {
+        var split = msg.Split(',');
+        var desc = split[0];
+        if (!otherHumans.ContainsKey(desc))
+        {
+            return;
+        }
         
+        var eulY = float.Parse(split[1]);
+        var human = otherHumans[desc] as SyncHuman;
+        human.SyncAttack(eulY);
+    }
+
+    private void OnHit(string msg)
+    {
+        var split = msg.Split(',');
+        var attackDesc = split[0]; // 攻击者
+        var hitDesc = split[1]; // 被攻击者
+        
+        // 找到被攻击的人 扣他血
+        if (hitDesc == NetManager.GetDesc()) // 如果是自己被扣血
+        {
+            // 血量HP就没在前端暴露 但是可以在这里做一个受击的动画 
+            Debug.Log("Your Character is under attack");
+        }
+        
+        // 如果是其他角色受击了 那么客户端这里要更新一下其他角色的血量显示.
+    }
+
+    private void OnDie(string msg)
+    {
+        // 删除掉死亡的玩家
+        var split = msg.Split(',');
+        var dieDesc = split[0]; // 死亡角色
+        if (dieDesc == NetManager.GetDesc())
+        {
+            Debug.Log("You Die Game Over");
+            return;
+        }
+
+        if (!otherHumans.ContainsKey(dieDesc))
+        {
+            return;
+        }
+
+        var h = otherHumans[dieDesc];
+        h.gameObject.SetActive(false);
     }
 }
