@@ -38,6 +38,10 @@ namespace Network
             {
                 _listeners[msgName](msgArgs);
             }
+            else
+            {
+                Debug.LogError($"Unknown Msg: {msgName}");
+            }
         }
         
         /// <summary>
@@ -60,7 +64,7 @@ namespace Network
         /// <summary>
         /// 发送消息给服务端
         /// </summary>
-        public static void Send(string sendSte)
+        public static void Send(string sendStr)
         {
             if (_socket == null)
             {
@@ -74,7 +78,8 @@ namespace Network
                 return;
             }
             
-            var sendBytes = System.Text.Encoding.UTF8.GetBytes(sendSte);
+            Debug.Log("[NetManager] SendMsg:" + sendStr);            
+            var sendBytes = System.Text.Encoding.UTF8.GetBytes(sendStr);
             _socket.Send(sendBytes);
         }
 
