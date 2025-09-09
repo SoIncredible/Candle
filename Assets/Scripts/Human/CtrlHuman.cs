@@ -1,3 +1,4 @@
+using Network;
 using UnityEngine;
 
 namespace Human
@@ -21,6 +22,12 @@ namespace Human
                 if (hit.collider != null && hit.collider.CompareTag("Terrain"))
                 {
                     MoveTo(hit.point);
+                    var sendStr = "Move|";
+                    sendStr += NetManager.GetDesc() + ",";
+                    sendStr += hit.point.x + ",";
+                    sendStr += hit.point.y + ",";
+                    sendStr += hit.point.z + ",";
+                    NetManager.Send(sendStr);
                 }
             }
         }

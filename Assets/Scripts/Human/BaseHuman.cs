@@ -20,7 +20,7 @@ namespace Human
         // 描述
         public string desc = "";
 
-        protected void MoveTo(Vector3 pos)
+        public void MoveTo(Vector3 pos)
         {
             _targetPosition = pos;
             isMoving = true;

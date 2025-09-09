@@ -100,6 +100,7 @@ namespace Network
                 var socket = (Socket)ar.AsyncState;
                 var count = socket.EndReceive(ar);
                 var receiveStr = System.Text.Encoding.UTF8.GetString(_readBuffer, 0, count);
+                Debug.Log("[NetManager] ReceiveMsg:" + receiveStr);
                 msgList.Add(receiveStr);
                 _socket.BeginReceive(_readBuffer, 0, 1024, 0, ReceiveCallback, _socket);
             }
