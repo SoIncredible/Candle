@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using DefaultNamespace;
@@ -25,6 +26,7 @@ public class Main : MonoBehaviour
         NetManager.AddListener("Attack", OnAttack);
         NetManager.AddListener("Hit", OnHit);
         NetManager.AddListener("Die", OnDie);
+        NetManager.AddListener("Dialog", OnDialog);
         
         NetManager.Connect("127.0.0.1", 8888);
         
@@ -53,6 +55,11 @@ public class Main : MonoBehaviour
     private void Update()
     {
         NetManager.Update();
+    }
+
+    private void OnDestroy()
+    {
+        NetManager.Destroy();
     }
 
     private void OnEnter(string msg)
@@ -189,5 +196,14 @@ public class Main : MonoBehaviour
 
         var h = otherHumans[dieDesc];
         h.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// 聊天协议
+    /// </summary>
+    /// <param name="msg"></param>
+    private void OnDialog(string msg)
+    {
+        
     }
 }
