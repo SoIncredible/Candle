@@ -104,12 +104,12 @@ namespace Network
             var sendBytesLen = (short)bodyBytes.Length;
             var lenBytes = BitConverter.GetBytes(sendBytesLen);
             // TODO Eddie 搞清楚 为什么不是整个SendBytes反转 而是只反转长度部分
-            // if (BitConverter.IsLittleEndian)
-            // {
-            //     // 这里只转换了表示协议长度的位?
-            //     Debug.Log("[Send] Reverse lenBytes");
-            //     lenBytes.Reverse();
-            // }
+            if (!BitConverter.IsLittleEndian)
+            {
+                // 这里只转换了表示协议长度的位?
+                Debug.Log("[Send] Reverse lenBytes");
+                lenBytes.Reverse();
+            }
            
             var sendBytes = lenBytes.Concat(bodyBytes).ToArray();
             _socket.Send(sendBytes);
@@ -164,11 +164,11 @@ namespace Network
             // 遇到大小端问题了
             // 添加字节序处理
             short bodyLength;
-            // if (BitConverter.IsLittleEndian)
-            // {
-            //     bodyLength = (short)((_readBuffer[0] << 8) | _readBuffer[1]);
-            // }
-            // else
+            if (!BitConverter.IsLittleEndian)
+            {
+                bodyLength = (short)((_readBuffer[1] << 8) | _readBuffer[0]);
+            }
+            else
             {
                 bodyLength = BitConverter.ToInt16(_readBuffer, 0);
             }
