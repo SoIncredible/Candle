@@ -10,7 +10,7 @@ namespace Network
     /// 要解决的问题
     /// 粘包问题 ✅
     /// 大端小端问题 ✅
-    /// 线程冲突问题 ⭕️
+    /// 线程冲突问题 ✅
     /// 半包问题 ✅
     /// 以及协议接收的缓冲区溢出了 自动扩容的问题 ⭕️
     /// TODO Eddie 需要测试 粘包、半包、线程冲突、大小端问题的处理代码是否生效
@@ -130,16 +130,22 @@ namespace Network
             }
             
             var sendBuffer = lenBytes.Concat(bodyBytes).ToArray();
-            _sendQueue.Enqueue(new ByteArray(sendBuffer));
 
+            int count;
+
+            lock (_sendQueue)
+            {
+                _sendQueue.Enqueue(new ByteArray(sendBuffer));
+                count = _sendQueue.Count;
+            }
+            
             // 如果当前的发送队列里面只有这一个待发送的数据, 调用Send
-            if (_sendQueue.Count == 1)
+            if (count == 1)
             {
                 _socket.BeginSend(sendBuffer, 0, sendBuffer.Length, 0, SendCallback, _socket);
             }
            
             // _socket.Send(sendBytes);
-            
         }
 
         /// <summary>
@@ -151,12 +157,20 @@ namespace Network
             // 拿到这次发送的长度, 根据发送成功的字节数 去除驻留在buffer中的数据
             var sendCount = _socket.EndSend(ar);
             // 如果实际发送的长度 小于应该发送的长度 则需要再次发送数据
-            var ba = _sendQueue.First();
+            ByteArray ba;
+            lock (_sendQueue)
+            {
+                ba = _sendQueue.First();
+            }
+            
             ba.readIdx += sendCount;
             if (ba.length == 0) // 说明完整发送了
             {
-                _sendQueue.Dequeue(); // 第一个队列元素出队
-                _sendQueue.TryPeek(out ba);
+                lock (_sendQueue)
+                {
+                    _sendQueue.Dequeue(); // 第一个队列元素出队
+                    _sendQueue.TryPeek(out ba);
+                }
             }
 
             if (ba != null) // 发送不完整, 或者发送完整且存在第二条数据.
