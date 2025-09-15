@@ -7,43 +7,184 @@ using UnityEngine;
 namespace Network
 {
     /// <summary>
+    /// ByteArray的设计蛮体现代码技术力的.
     /// 要解决的问题
     /// 粘包问题 ✅
     /// 大端小端问题 ✅
     /// 线程冲突问题 ✅
     /// 半包问题 ✅
-    /// 以及协议接收的缓冲区溢出了 自动扩容的问题 ⭕️
+    /// 以及协议接收的缓冲区溢出了 自动扩容的问题 ✅
     /// TODO Eddie 需要测试 粘包、半包、线程冲突、大小端问题的处理代码是否生效
     /// </summary>
     public class ByteArray
     {
+        public const int BufferDefaultLength = 1024;
+        
+        // 初始的大小
+        public int initSize;
+        
         public byte[] bytes;
         public int readIdx; // 发送的idx 
         public int writeIdx; // 写入的idx
-        public int length => writeIdx - readIdx;
 
+        // 缓冲区的容量
+        public int capacity;
+
+        // 剩余空间
+        public int remain => capacity - writeIdx;
+        
+        // 缓冲区中有效数据长度
+        public int ValidDataLength => writeIdx - readIdx;
+        
         public ByteArray(byte[] bytes)
         {
             this.bytes = bytes;
             readIdx = 0;
+            initSize = bytes.Length;
             writeIdx = bytes.Length;
+            capacity = bytes.Length;
         }
+
+        public ByteArray(int size = BufferDefaultLength)
+        {
+            bytes = new byte[size];
+            capacity = size;
+            initSize = size;
+            readIdx = 0;
+            writeIdx = 0;
+        }
+
+        /// <summary>
+        /// 重设尺寸
+        /// </summary>
+        /// <param name="size"></param>
+        public void ReSize(int size)
+        {
+            if(size < ValidDataLength) return; // 如果要设置的尺寸比当前缓冲区中待发送的数据长度还要小 返回
+            if(size < initSize) return; // 如果要设置的尺寸比初始的尺寸要小 返回
+            var n = 1;
+            while (n < size) n *= 2;
+            capacity = n;
+            var newBytes = new byte[capacity];
+            Array.Copy(bytes, readIdx, newBytes, 0, ValidDataLength);
+            bytes = newBytes;
+            writeIdx = ValidDataLength;
+            readIdx = 0;
+        }
+
+        /// <summary>
+        /// 检查并移动数据 为了提高remain的长度 能缓冲进来更多的数据
+        /// </summary>
+        public void CheckAndMoveBytes()
+        {
+            // 这里将触发移动数据的长度定为8, 如果太长的话 移动数据的操作就会太耗费时间了
+            if (ValidDataLength < 8)
+            {
+                MoveBytes();
+            }
+        }
+
+        public void MoveBytes()
+        {
+            Array.Copy(bytes, readIdx, bytes, 0, ValidDataLength);
+            writeIdx = ValidDataLength; // 只要发生了移动操作, writeIdx和readIdx要相应变化
+            readIdx = 0;
+        }
+
+        /// <summary>
+        /// 写入数据
+        /// </summary>
+        /// <param name="bs"></param>
+        /// <param name="offset">在bs数组中的下标为offset的位置开始Copy</param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        public int Write(byte[] bs, int offset, int count)
+        {
+            // 如果剩余的空间比要写入进来的数据长度小
+            if (remain < count)
+            {
+                ReSize(ValidDataLength + count);
+            }
+            Array.Copy(bs, offset, bytes, writeIdx, count);
+            writeIdx += count;
+            return count;
+        }
+
+        /// <summary>
+        /// 读取数据
+        /// 这个byte[]是个值类型吧, 返回不出去啊❌ byte是值类型, byte[]是引用类型
+        /// </summary>
+        /// <param name="bs"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        public int Read(byte[] bs, int offset, int count)
+        {
+            // 找到length和count中小的那个给到count
+            count = Math.Min(ValidDataLength, count);
+            Array.Copy(bytes, readIdx, bs, offset, count);
+            readIdx += count;
+            CheckAndMoveBytes();
+            return count;
+        }
+
+        /// <summary>
+        /// 注意大小端的问题
+        /// </summary>
+        /// <returns></returns>
+        public short ReadInt16()
+        {
+            // BitConverter.ToInt16会自动地 只取前两个字节. 将这两个字节转成Int 
+            // 遇到大小端问题了
+            // 添加字节序处理
+            short bodyLength;
+            // 如果当前机器是大端, 则该机器的ConvertToInt16是不对的, 需要我们手动处理一下
+            if (!BitConverter.IsLittleEndian)
+            {
+                bodyLength = (short)(bytes[readIdx + 1] << 8 | bytes[readIdx]);
+            }
+            else
+            {
+                bodyLength = BitConverter.ToInt16(bytes, readIdx);
+            }
+
+            readIdx += 2;
+            CheckAndMoveBytes();
+            return bodyLength;
+        }
+        
+        /// <summary>
+        /// 注意大小端的问题
+        /// </summary>
+        /// <returns></returns>        
+        public int ReadInt32()
+        {
+            int bodyLength;
+            // 如果当前机器是大端 则该机器的ConvertToInt32不能用, 需要我们自己处理
+            if (!BitConverter.IsLittleEndian)
+            {
+                bodyLength = bytes[readIdx + 3] << 24 | bytes[readIdx + 2] << 16 | bytes[readIdx + 1] << 8 | bytes[readIdx];;
+            }
+            else
+            {
+                bodyLength = BitConverter.ToInt32(bytes, readIdx);
+            }   
+            readIdx += 4;
+            CheckAndMoveBytes();
+            return bodyLength;
+        }
+        
     }
     
     /// <summary>
     /// TODO Eddie 将NetManager改造成Singleton
-    /// TODO Eddie 干掉所有的数组Copy操作
     /// </summary>
     public static class NetManager
     {
-        public const int ReadBufferLength = 1024;
-        public const int SendBufferLength = 1024;
-        
         private static Socket _socket;
         
         // 接收缓冲区
-        private static byte[] _readBuffer = new byte[ReadBufferLength];
-        private static int _readBufferCount; // 有点像是下标的意思
+        private static ByteArray _readBuffer = new ByteArray();
         
         // 发送队列
         private static Queue<ByteArray> _sendQueue = new Queue<ByteArray>();
@@ -94,7 +235,7 @@ namespace Network
                 // TODO Eddie 改造成 BeginConnect
                 _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                 _socket.Connect(ip, port);
-                _socket.BeginReceive(_readBuffer, 0, ReadBufferLength, 0, ReceiveCallback, _socket);
+                _socket.BeginReceive(_readBuffer.bytes, _readBuffer.writeIdx, _readBuffer.remain, 0, ReceiveCallback, _socket);
             }
         }
 
@@ -135,7 +276,10 @@ namespace Network
 
             lock (_sendQueue)
             {
-                _sendQueue.Enqueue(new ByteArray(sendBuffer));
+                var ba = new ByteArray(sendBuffer.Length);
+                ba.Write(sendBuffer, 0, sendBuffer.Length);
+                _sendQueue.Enqueue(ba);
+                // _sendQueue.Enqueue(new ByteArray(sendBuffer)); 这两种方法都可以
                 count = _sendQueue.Count;
             }
             
@@ -163,8 +307,8 @@ namespace Network
                 ba = _sendQueue.First();
             }
             
-            ba.readIdx += sendCount;
-            if (ba.length == 0) // 说明完整发送了
+            ba.readIdx += sendCount; // 成功发送的数据长度 更新下一次的buffer中读取的idx
+            if (ba.ValidDataLength == 0) // 说明完整发送了
             {
                 lock (_sendQueue)
                 {
@@ -186,7 +330,8 @@ namespace Network
 
         public static void RemoveListener()
         {
-            // TODO Eddie 
+            _listeners.Clear();
+            _listeners = null;
         }
 
         /// <summary>
@@ -203,11 +348,17 @@ namespace Network
                 var socket = (Socket)ar.AsyncState;
                 // 先把bufferCount数据更新
                 var count = socket.EndReceive(ar);
-                _readBufferCount += count; // 更新下一次可以接收的地方
+                _readBuffer.writeIdx += count; // 更新下一次可以写入的idx
                 
                 OnReceiveData();
-                
-                _socket.BeginReceive(_readBuffer, _readBufferCount, ReadBufferLength - _readBufferCount, 0, ReceiveCallback, _socket);
+
+                // 如果当前缓冲区的剩余数据容量小于8个字节了, 扩容
+                if (_readBuffer.remain < 8)
+                {
+                    _readBuffer.MoveBytes();
+                    _readBuffer.ReSize(_readBuffer.capacity * 2);
+                }
+                _socket.BeginReceive(_readBuffer.bytes, _readBuffer.writeIdx, _readBuffer.remain, 0, ReceiveCallback, _socket);
             }
             catch (SocketException e)
             {
@@ -218,41 +369,26 @@ namespace Network
         private static void OnReceiveData()
         {
             // 长度小于协议长度位数
-            if (_readBufferCount <= 2)
+            if (_readBuffer.ValidDataLength <= 2)
             {
                 // 啥也不做 把数据写入_bufferCount之后
                 return;
             }
-
-            // BitConverter.ToInt16会自动地 只取前两个字节. 将这两个字节转成Int 
-            // 遇到大小端问题了
-            // 添加字节序处理
-            short bodyLength;
-            if (!BitConverter.IsLittleEndian)
-            {
-                bodyLength = (short)((_readBuffer[1] << 8) | _readBuffer[0]);
-            }
-            else
-            {
-                bodyLength = BitConverter.ToInt16(_readBuffer, 0);
-            }
+            
+            var bodyLength = _readBuffer.ReadInt16();
                 
-            if (_readBufferCount < 2 + bodyLength)
+            if (_readBuffer.ValidDataLength < bodyLength)
             {
                 return;
             }
 
             // 如果数据满足了, 那么就要取出来了 然后更新一下_bufferCount
             // 从缓冲里面提取出消息来
-            var receiveStr = System.Text.Encoding.UTF8.GetString(_readBuffer, 2, bodyLength);
+            var readByte = new byte[bodyLength];
+            _readBuffer.Read(readByte, 0, bodyLength);
+            var receiveStr = System.Text.Encoding.UTF8.GetString(readByte);
             Debug.Log($"RecvMsg: {receiveStr}");
             msgList.Add(receiveStr);
-                    
-            // 缓冲区里面的数据需要更新一下
-            var start = 2 + bodyLength;
-            _readBufferCount -= start;
-            Array.Copy(_readBuffer, start, _readBuffer, 0, _readBufferCount);
-            
             OnReceiveData();
         }
 
