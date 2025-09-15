@@ -100,6 +100,8 @@ namespace Network
         /// <returns></returns>
         public int Write(byte[] bs, int offset, int count)
         {
+            // 先尝试扩展remain
+            CheckAndMoveBytes();
             // 如果剩余的空间比要写入进来的数据长度小
             if (remain < count)
             {
@@ -386,9 +388,11 @@ namespace Network
             // 从缓冲里面提取出消息来
             var readByte = new byte[bodyLength];
             _readBuffer.Read(readByte, 0, bodyLength);
+            
             var receiveStr = System.Text.Encoding.UTF8.GetString(readByte);
             Debug.Log($"RecvMsg: {receiveStr}");
             msgList.Add(receiveStr);
+            
             OnReceiveData();
         }
 
