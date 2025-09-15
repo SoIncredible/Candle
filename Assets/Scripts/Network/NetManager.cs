@@ -149,8 +149,7 @@ namespace Network
             {
                 bodyLength = BitConverter.ToInt16(bytes, readIdx);
             }
-
-            readIdx += 2;
+            
             CheckAndMoveBytes();
             return bodyLength;
         }
@@ -171,7 +170,7 @@ namespace Network
             {
                 bodyLength = BitConverter.ToInt32(bytes, readIdx);
             }   
-            readIdx += 4;
+            
             CheckAndMoveBytes();
             return bodyLength;
         }
@@ -377,6 +376,7 @@ namespace Network
                 return;
             }
             
+            // 不可以在ReadInt16里面先更新readIdx, 有可能在下面的if分支里面阻断
             var bodyLength = _readBuffer.ReadInt16();
                 
             if (_readBuffer.ValidDataLength < bodyLength)
@@ -384,6 +384,7 @@ namespace Network
                 return;
             }
 
+            _readBuffer.readIdx += 2;
             // 如果数据满足了, 那么就要取出来了 然后更新一下_bufferCount
             // 从缓冲里面提取出消息来
             var readByte = new byte[bodyLength];
