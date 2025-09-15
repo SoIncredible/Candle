@@ -8,28 +8,45 @@ namespace Network
 {
     /// <summary>
     /// 要解决的问题
-    /// 粘包、半包问题
-    /// 大端小端问题
-    /// 线程冲突问题
-    /// 以及协议接收的缓冲区溢出了 自动扩容的问题
+    /// 粘包问题 ✅
+    /// 大端小端问题 ✅
+    /// 线程冲突问题 ⭕️
+    /// 半包问题 ✅
+    /// 以及协议接收的缓冲区溢出了 自动扩容的问题 ⭕️
+    /// TODO Eddie 需要测试 粘包、半包、线程冲突、大小端问题的处理代码是否生效
     /// </summary>
     public class ByteArray
     {
-        
+        public byte[] bytes;
+        public int readIdx; // 发送的idx 
+        public int writeIdx; // 写入的idx
+        public int length => writeIdx - readIdx;
+
+        public ByteArray(byte[] bytes)
+        {
+            this.bytes = bytes;
+            readIdx = 0;
+            writeIdx = bytes.Length;
+        }
     }
     
     /// <summary>
     /// TODO Eddie 将NetManager改造成Singleton
+    /// TODO Eddie 干掉所有的数组Copy操作
     /// </summary>
     public static class NetManager
     {
         public const int ReadBufferLength = 1024;
+        public const int SendBufferLength = 1024;
         
         private static Socket _socket;
         
         // 接收缓冲区
         private static byte[] _readBuffer = new byte[ReadBufferLength];
-        private static int _bufferCount; // 有点像是下标的意思
+        private static int _readBufferCount; // 有点像是下标的意思
+        
+        // 发送队列
+        private static Queue<ByteArray> _sendQueue = new Queue<ByteArray>();
         
         // 委托类型
         public delegate void MsgListener(string str);
@@ -100,19 +117,52 @@ namespace Network
 
             // 改用 协议长度+协议内容的方式
             Debug.Log("[NetManager] SendMsg:" + sendStr);            
+            // bodyBytes字段与大小端没有关系, 或者说, System.Text.Encoding.UTF8.GetBytes内部帮我们处理了大小端\
+            // 所以只对表示协议长度的部分进行大小端的处理就可以了.
             var bodyBytes = System.Text.Encoding.UTF8.GetBytes(sendStr);
             var sendBytesLen = (short)bodyBytes.Length;
             var lenBytes = BitConverter.GetBytes(sendBytesLen);
-            // TODO Eddie 搞清楚 为什么不是整个SendBytes反转 而是只反转长度部分
             if (!BitConverter.IsLittleEndian)
             {
                 // 这里只转换了表示协议长度的位?
                 Debug.Log("[Send] Reverse lenBytes");
                 lenBytes.Reverse();
             }
+            
+            var sendBuffer = lenBytes.Concat(bodyBytes).ToArray();
+            _sendQueue.Enqueue(new ByteArray(sendBuffer));
+
+            // 如果当前的发送队列里面只有这一个待发送的数据, 调用Send
+            if (_sendQueue.Count == 1)
+            {
+                _socket.BeginSend(sendBuffer, 0, sendBuffer.Length, 0, SendCallback, _socket);
+            }
            
-            var sendBytes = lenBytes.Concat(bodyBytes).ToArray();
-            _socket.Send(sendBytes);
+            // _socket.Send(sendBytes);
+            
+        }
+
+        /// <summary>
+        /// 这段代码蛮体现技术力的.
+        /// </summary>
+        /// <param name="ar"></param>
+        private static void SendCallback(IAsyncResult ar)
+        {
+            // 拿到这次发送的长度, 根据发送成功的字节数 去除驻留在buffer中的数据
+            var sendCount = _socket.EndSend(ar);
+            // 如果实际发送的长度 小于应该发送的长度 则需要再次发送数据
+            var ba = _sendQueue.First();
+            ba.readIdx += sendCount;
+            if (ba.length == 0) // 说明完整发送了
+            {
+                _sendQueue.Dequeue(); // 第一个队列元素出队
+                _sendQueue.TryPeek(out ba);
+            }
+
+            if (ba != null) // 发送不完整, 或者发送完整且存在第二条数据.
+            {
+                _socket.BeginSend(ba.bytes, ba.readIdx, ba.writeIdx, 0, SendCallback, ba);
+            }
         }
 
         public static void AddListener(string msgName, MsgListener listener)
@@ -139,11 +189,11 @@ namespace Network
                 var socket = (Socket)ar.AsyncState;
                 // 先把bufferCount数据更新
                 var count = socket.EndReceive(ar);
-                _bufferCount += count; // 更新下一次可以接收的地方
+                _readBufferCount += count; // 更新下一次可以接收的地方
                 
                 OnReceiveData();
                 
-                _socket.BeginReceive(_readBuffer, _bufferCount, ReadBufferLength - _bufferCount, 0, ReceiveCallback, _socket);
+                _socket.BeginReceive(_readBuffer, _readBufferCount, ReadBufferLength - _readBufferCount, 0, ReceiveCallback, _socket);
             }
             catch (SocketException e)
             {
@@ -154,7 +204,7 @@ namespace Network
         private static void OnReceiveData()
         {
             // 长度小于协议长度位数
-            if (_bufferCount <= 2)
+            if (_readBufferCount <= 2)
             {
                 // 啥也不做 把数据写入_bufferCount之后
                 return;
@@ -173,7 +223,7 @@ namespace Network
                 bodyLength = BitConverter.ToInt16(_readBuffer, 0);
             }
                 
-            if (_bufferCount < 2 + bodyLength)
+            if (_readBufferCount < 2 + bodyLength)
             {
                 return;
             }
@@ -186,8 +236,8 @@ namespace Network
                     
             // 缓冲区里面的数据需要更新一下
             var start = 2 + bodyLength;
-            _bufferCount -= start;
-            Array.Copy(_readBuffer, start, _readBuffer, 0, _bufferCount);
+            _readBufferCount -= start;
+            Array.Copy(_readBuffer, start, _readBuffer, 0, _readBufferCount);
             
             OnReceiveData();
         }
