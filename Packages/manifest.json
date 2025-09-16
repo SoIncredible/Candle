@@ -1,7 +1,9 @@
 {
   "dependencies": {
+    "com.tuyoogame.yooasset": "2.3.15",
     "com.unity.collab-proxy": "2.5.1",
     "com.unity.feature.development": "1.0.1",
+    "com.unity.memoryprofiler": "1.1.9",
     "com.unity.textmeshpro": "3.0.6",
     "com.unity.timeline": "1.7.6",
     "com.unity.ugui": "1.0.0",
@@ -37,5 +39,14 @@
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
     "com.unity.modules.xr": "1.0.0"
-  }
+  },
+  "scopedRegistries": [
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.tuyoogame.yooasset"
+      ]
+    }
+  ]
 }
