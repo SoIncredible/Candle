@@ -17,16 +17,16 @@ public class ResourceManager : Singleton<ResourceManager>
         YooAssets.LoadSceneSync(sceneName);
     }
 
-    public IEnumerator LoadSceneAsync(string sceneName)
-    {
-        return YooAssets.LoadSceneAsync(sceneName);
-    }
-
-    public void LoadSceneAsync(string sceneName)
-    {
-        var handle = YooAssets.LoadSceneAsync(sceneName);
-        GameManager.Instance.StartCoroutine(handle);   
-    }
+    // public IEnumerator LoadSceneAsync(string sceneName)
+    // {
+    //     return YooAssets.LoadSceneAsync(sceneName);
+    // }
+    //
+    // public void LoadSceneAsync(string sceneName)
+    // {
+    //     var handle = YooAssets.LoadSceneAsync(sceneName);
+    //     GameManager.Instance.StartCoroutine(handle);   
+    // }
 
     // public GameObject InstantiateAsync(string prefabName, Transform parent, bool active = true)
     // {

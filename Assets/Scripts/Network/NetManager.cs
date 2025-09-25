@@ -176,12 +176,23 @@ namespace Network
         }
         
     }
-    
+
+    public enum NetEvent
+    {
+        None,
+        ConnectSuccess,
+        ConnectFail,
+        ConnectClose,
+    }
+
     /// <summary>
     /// TODO Eddie 将NetManager改造成Singleton
     /// </summary>
     public static class NetManager
     {
+        private static bool _isConnecting;
+        private static bool _isClosing;
+        
         private static Socket _socket;
         
         // 接收缓冲区
@@ -192,6 +203,10 @@ namespace Network
         
         // 委托类型
         public delegate void MsgListener(string str);
+        
+        public delegate void EventListener(string err);
+
+        public static Dictionary<NetEvent, EventListener> eventListeners = new Dictionary<NetEvent, EventListener>();
         
         // 监听列表
         private static Dictionary<string, MsgListener> _listeners = new Dictionary<string, MsgListener>();
@@ -227,16 +242,79 @@ namespace Network
         /// </summary>
         public static void Connect(string ip, int port)
         {
-            if (_socket != null && !_socket.Connected)
+            if (_socket != null && _socket.Connected)
             {
                 Debug.LogError("[NetManager]已经连接了!");
+                return;
+            }
+
+            if (_isConnecting)
+            {
+                Debug.LogError("[NetManager]: 当前正在连接");
+                return;
+            }
+            
+            InitState();
+            _isConnecting = true;
+            _socket.NoDelay = true;
+            _socket.BeginConnect(ip, port, ConnectCallback, _socket);
+        }
+
+        /// <summary>
+        /// 需要想办法让这个接口在Application.Quit中调用
+        /// </summary>
+        public static void Close()
+        {
+            if (_socket == null || !_socket.Connected)
+            {
+                return;
+            }
+
+            if (_isConnecting)
+            {
+                return;
+            }
+
+            // 还有发送数据
+            if (_sendQueue.Count > 0)
+            {
+                _isClosing = true;
             }
             else
             {
-                // TODO Eddie 改造成 BeginConnect
-                _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                _socket.Connect(ip, port);
-                _socket.BeginReceive(_readBuffer.bytes, _readBuffer.writeIdx, _readBuffer.remain, 0, ReceiveCallback, _socket);
+                _socket.Close();
+                FireEvent(NetEvent.ConnectClose, "");
+            }
+            
+        }
+        
+        private static void InitState()
+        {
+            _socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            _readBuffer = new ByteArray();
+            
+            _sendQueue = new Queue<ByteArray>();
+
+            _isConnecting = false;
+        }
+
+        private static void ConnectCallback(IAsyncResult ar)
+        {
+            try
+            {
+                var socket = (Socket)ar.AsyncState;
+                socket.EndConnect(ar);
+                Debug.Log("Socket connected");
+                FireEvent(NetEvent.ConnectSuccess, "");
+                _isConnecting = false;
+                // _socket.BeginReceive(_readBuffer.bytes, _readBuffer.writeIdx, _readBuffer.remain, 0, ReceiveCallback,
+                //     _socket);
+            }
+            catch (SocketException e)
+            {
+                Debug.LogError("Socket Connect fail" + e);
+                FireEvent(NetEvent.ConnectFail, e.ToString());
+                _isConnecting = false;
             }
         }
 
@@ -418,6 +496,34 @@ namespace Network
             }
             
             return _socket.LocalEndPoint.ToString();
+        }
+
+        public static void AddEventListener(NetEvent netEvent, EventListener listener)
+        {
+            if (!eventListeners.TryAdd(netEvent, listener))
+            {
+                eventListeners[netEvent] += listener;
+            }
+        }
+
+        public static void RemoveEventListener(NetEvent netEvent, EventListener listener)
+        {
+            if (eventListeners.ContainsKey(netEvent))
+            {
+                eventListeners[netEvent] -= listener;
+                if (eventListeners[netEvent] == null)
+                {
+                    eventListeners.Remove(netEvent);
+                }
+            }
+        }
+
+        private static void FireEvent(NetEvent netEvent, string err)
+        {
+            if (eventListeners.ContainsKey(netEvent))
+            {
+                eventListeners[netEvent](err);
+            }
         }
     }
 }
